@@ -1,14 +1,12 @@
-﻿namespace Gremlin.Net
+﻿namespace Gremlin.Net.Driver
 
 open System
 open System.Net.WebSockets
-open System.Diagnostics.Tracing
+open System.Diagnostics
 open Gremlin.Net.Driver
 open Gremlin.Net.Structure.IO.GraphSON
-open FSharp
 open FSharpx
 open FSharp.Control.Tasks.V2
-
 
 module Result =
 
@@ -30,7 +28,7 @@ type CosmosGraphConfig = {
     Collection: string
 }
 
-type RenewableGremlinClient(config: CosmosGraphConfig, logger:System.Diagnostics.TraceSource) =
+type RenewableGremlinClient(config: CosmosGraphConfig, logger:TraceSource) =
     let makeClient server =
         let settings =
             ConnectionPoolSettings(
