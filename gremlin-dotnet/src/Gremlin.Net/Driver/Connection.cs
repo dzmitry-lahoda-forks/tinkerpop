@@ -126,7 +126,7 @@ namespace Gremlin.Net.Driver
             {
                 if (_callbackByRequestId.TryRemove(receivedMsg.RequestId, out var responseHandler))
                 {
-                    responseHandler.HandleFailure(e);
+                    responseHandler?.HandleFailure(e);
                 }
             }
         }

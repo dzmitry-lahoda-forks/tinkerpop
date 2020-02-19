@@ -19,7 +19,6 @@ module Result =
 
 [<CLIMutable>]
 type CosmosGraphConfig = {
-    ConnectionString: string
     PoolSize: Int32
     MaxInProcessPerConnection: Int32
     AuthKey: string
@@ -55,9 +54,11 @@ type RenewableGremlinClient(config: CosmosGraphConfig, logger:TraceSource) =
                 |> Result.map makeClient
                 |> Result.tap (fun _ -> logger.TraceInformation("Successfully connected to Gremlin location {0}", location))
             with
-                ex -> tryMakeClient collectionLink authKey rest
+                newEx -> 
+                    printfn "%A" newEx
+                    tryMakeClient collectionLink authKey rest
         | [] ->
-            Error "Can't connect to any of the regions"
+            Error "WTF"
 
     let createClient () =
         let collectionLink = sprintf "/dbs/%s/colls/%s" config.Database config.Collection
@@ -85,16 +86,18 @@ type RenewableGremlinClient(config: CosmosGraphConfig, logger:TraceSource) =
         member this.SubmitAsync(requestMessage) = task {
                 let client = this.Client
                 try
-                    return! client.SubmitAsync(requestMessage) |> Async.AwaitTask
+                    return! client.SubmitAsync(requestMessage)
                 with
                 | :? WebSocketException as ex ->
+                    printfn "Got a WebSocketException. Will try to recreate agent"
                     logger.TraceInformation("Got a WebSocketException {0}. Will try to recreate agent", ex)
                     this.Recreate(client)
-                    return! this.Client.SubmitAsync(requestMessage) |> Async.AwaitTask
+                    return! this.Client.SubmitAsync(requestMessage)
                 | ex when (ex.InnerException :? WebSocketException) ->
+                    printfn "Got a WebSocketException. Will try to recreate agent"
                     logger.TraceInformation("Got a WebSocketException {0}. Will try to recreate agent", ex.InnerException)
                     this.Recreate(client)
-                    return! this.Client.SubmitAsync(requestMessage) |> Async.AwaitTask
+                    return! this.Client.SubmitAsync(requestMessage)
             }
 
         member __.Dispose() =
