@@ -3,6 +3,5 @@
 
 ```sh
 dotnet run --configuration Release
-
-dotnet publish --self-contained --runtime win10-x64
+dotnet publish --self-contained true --runtime win10-x64
 ```
