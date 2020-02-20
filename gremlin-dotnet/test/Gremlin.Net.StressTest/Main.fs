@@ -42,6 +42,7 @@ let main argv =
     Console.ReadLine() |> ignore
     let queueSize = (config.PoolSize * config.MaxInProcessPerConnection)  / 4
     let mutable current = 0
+    // TODO: better model requesters as actors which return results into acotr and antoher actor which check that pool is free and sends messages to them
     let increment() = 
         let my = Volatile.Read(&current)
         if my + 1 >= queueSize then 
@@ -50,7 +51,7 @@ let main argv =
             let previous = Interlocked.CompareExchange(&current, my + 1, my)
             previous = my
     let queries = 
-        seq { 1 .. 50_000} 
+        seq { 1 .. 5000_000} 
         |> Seq.map (fun (ms) -> async {           
            while increment() |> not do
              do! Async.Sleep 10

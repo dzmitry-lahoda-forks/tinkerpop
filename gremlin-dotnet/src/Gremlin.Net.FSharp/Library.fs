@@ -7,6 +7,8 @@ open Gremlin.Net.Driver
 open Gremlin.Net.Structure.IO.GraphSON
 open FSharpx
 open FSharp.Control.Tasks.V2
+open System.Diagnostics
+open System.Diagnostics.Tracing
 
 module Result =
 
@@ -87,7 +89,7 @@ type RenewableGremlinClient(config: CosmosGraphConfig, logger:TraceSource) =
                 let client = this.Client
                 try
                     return! client.SubmitAsync(requestMessage)
-                with
+                with               
                 | :? WebSocketException as ex ->
                     printfn "Got a WebSocketException. Will try to recreate agent"
                     logger.TraceInformation("Got a WebSocketException {0}. Will try to recreate agent", ex)
@@ -98,6 +100,10 @@ type RenewableGremlinClient(config: CosmosGraphConfig, logger:TraceSource) =
                     logger.TraceInformation("Got a WebSocketException {0}. Will try to recreate agent", ex.InnerException)
                     this.Recreate(client)
                     return! this.Client.SubmitAsync(requestMessage)
+                | ex ->
+                    logger.TraceInformation("Not handled error {0}", ex)
+                    raise ex
+                    return null
             }
 
         member __.Dispose() =
