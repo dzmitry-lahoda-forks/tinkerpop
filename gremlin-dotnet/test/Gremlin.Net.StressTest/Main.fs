@@ -66,10 +66,7 @@ let main argv =
     let config = {
         PoolSize = 25;
         MaxInProcessPerConnection = 25;
-        AuthKey = "0EQY6QKvl9gjOn94fvCy1Su3cUZa2XehSlYn6IMWIaD37WpClOFzEq88uFG4daVSPmENraVrPgJWKHS4xUOxnw==";
-        Locations = [|"batman-sod-optout-graph-dev.gremlin.cosmosdb.azure.com:443"|];
-        Database = "ccpa"; 
-        Collection = "infections"
+
     }
 
     let trace = Diagnostics.TraceSource("Gremlin")
