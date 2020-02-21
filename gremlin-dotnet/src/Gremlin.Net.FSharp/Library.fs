@@ -9,6 +9,8 @@ open FSharpx
 open FSharp.Control.Tasks.V2
 open System.Diagnostics
 open System.Diagnostics.Tracing
+open Gremlin.Net.Driver.Exceptions
+open Gremlin.Net.Driver.Messages
 
 module Result =
 
@@ -60,7 +62,7 @@ type RenewableGremlinClient(config: CosmosGraphConfig, logger:TraceSource) =
                     printfn "%A" newEx
                     tryMakeClient collectionLink authKey rest
         | [] ->
-            Error "WTF"
+            Error "Region"
 
     let createClient () =
         let collectionLink = sprintf "/dbs/%s/colls/%s" config.Database config.Collection
@@ -72,38 +74,34 @@ type RenewableGremlinClient(config: CosmosGraphConfig, logger:TraceSource) =
 
     let mutable client = createClient ()
 
-    let clientLock = Object()
-
-    member this.Recreate(failedClient: GremlinClient) =
-        lock clientLock <| fun () ->
-            if Object.ReferenceEquals(failedClient, this.Client) then
-                logger.TraceInformation("Creating new client")
-                (this.Client :> IDisposable).Dispose()
-                client <- createClient()
-
-    member __.Client
-        with get() = lock clientLock (fun () -> client)
 
     interface IGremlinClient with
         member this.SubmitAsync(requestMessage) = task {
-                let client = this.Client
                 try
                     return! client.SubmitAsync(requestMessage)
-                with               
-                | :? WebSocketException as ex ->
-                    printfn "Got a WebSocketException. Will try to recreate agent"
-                    logger.TraceInformation("Got a WebSocketException {0}. Will try to recreate agent", ex)
-                    this.Recreate(client)
-                    return! this.Client.SubmitAsync(requestMessage)
-                | ex when (ex.InnerException :? WebSocketException) ->
-                    printfn "Got a WebSocketException. Will try to recreate agent"
-                    logger.TraceInformation("Got a WebSocketException {0}. Will try to recreate agent", ex.InnerException)
-                    this.Recreate(client)
-                    return! this.Client.SubmitAsync(requestMessage)
+                with              
                 | ex ->
-                    logger.TraceInformation("Not handled error {0}", ex)
-                    raise ex
-                    return null
+                    // next issues can happend for normal call in flight call was bad and we hit into closed-closing connection
+                    let error = if ex :? AggregateException then ex.InnerException else ex
+                    let code = 
+                        match error with 
+                        |  :? ResponseException as re -> 
+                            re.StatusCode = ResponseStatusCode.ServerError || re.StatusCode = ResponseStatusCode.ServerTimeout
+                        | _ -> false
+                    let reSubmit =  
+                        error :? WebSocketException // usual network errors
+                        || error :? ConnectionPoolBusyException // can happend even not in case of full exostion
+                        || error :? ServerUnavailableException // same as above, see code of client
+                        || error :? InvalidOperationException // for bugs and corrupted network and some other in flight call lead to error + close https://issues.apache.org/jira/browse/TINKERPOP-2019 https://github.com/apache/tinkerpop/pull/1250s
+                        || code
+                    if reSubmit then    
+                        logger.TraceInformation("Got a WebSocketException {0}. Will try to recreate agent", ex)
+                        // NOTE: we already have wait here becuse of socket client recreation
+                        return! client.SubmitAsync(requestMessage)
+                    else
+                        logger.TraceInformation("Not handled error {0}", ex)
+                        reraise' ex
+                        return null
             }
 
         member __.Dispose() =

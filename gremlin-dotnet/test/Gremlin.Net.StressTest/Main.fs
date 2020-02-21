@@ -66,7 +66,10 @@ let main argv =
     let config = {
         PoolSize = 25;
         MaxInProcessPerConnection = 25;
-
+        AuthKey = "0EQY6QKvl9gjOn94fvCy1Su3cUZa2XehSlYn6IMWIaD37WpClOFzEq88uFG4daVSPmENraVrPgJWKHS4xUOxnw==";
+        Locations = [|"batman-sod-optout-graph-dev.gremlin.cosmosdb.azure.com:443"|];
+        Database = "ccpa"; 
+        Collection = "infections"
     }
 
     let trace = Diagnostics.TraceSource("Gremlin")
@@ -95,8 +98,8 @@ let main argv =
     client.SubmitAsync(query, parameters) |> Async.AwaitTask |> Async.RunSynchronously
     printfn "Start clumsy"
     Console.ReadLine() |> ignore
-    let queueSize = 100// (config.PoolSize * config.MaxInProcessPerConnection)  / 3
-    
+    let queueSize = 70 // (config.PoolSize * config.MaxInProcessPerConnection)  / 3
+  
 
     let mutable x = 0
     let queries() = async {           
